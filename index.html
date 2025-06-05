@@ -119,8 +119,10 @@
     transition: background 0.3s ease;
     border: 2px solid transparent;
     user-select: none;
+    outline: none;
   }
-  .answers li:hover {
+  .answers li:hover,
+  .answers li:focus {
     background: #d6e0f0;
   }
   .answers li.selected {
@@ -171,13 +173,13 @@
 </head>
 <body>
 
-<div class="quiz-wrapper" role="main" aria-live="polite">
+<div class="quiz-wrapper" role="main" aria-live="polite" aria-atomic="true">
   <h1>Interactive Quiz</h1>
-  <div id="question">Loading question...</div>
+  <div id="question" tabindex="0">Loading question...</div>
   <ul class="answers" id="answers"></ul>
-  <div id="explanation"></div>
-  <button id="nextBtn" disabled>Next</button>
-  <div id="score"></div>
+  <div id="explanation" aria-live="polite"></div>
+  <button id="nextBtn" disabled aria-disabled="true" aria-label="Next question">Next</button>
+  <div id="score" aria-live="polite"></div>
 </div>
 
 <script>
@@ -192,7 +194,7 @@
   let score = 0;
   let questions = [];
 
-  // Replace this with your Azure Function URL
+  // TODO: Replace with your actual Azure Function URL
   const functionUrl = 'https://quiz123.azurewebsites.net/api/HttpTrigger1?';
 
   async function fetchQuestions() {
@@ -214,18 +216,25 @@
     explanationEl.textContent = '';
     selectedAnswerIndex = null;
     nextBtn.disabled = true;
+    nextBtn.setAttribute('aria-disabled', 'true');
 
     const q = questions[currentQuestionIndex];
     questionEl.textContent = q.question || q.q || "Question text missing";
+    questionEl.focus();
 
     answersEl.innerHTML = '';
     q.answers.forEach((answer, idx) => {
       const li = document.createElement('li');
       li.textContent = answer;
       li.tabIndex = 0;
+      li.setAttribute('role', 'button');
+      li.setAttribute('aria-pressed', 'false');
       li.addEventListener('click', () => selectAnswer(idx));
       li.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') selectAnswer(idx);
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          selectAnswer(idx);
+        }
       });
       answersEl.appendChild(li);
     });
@@ -237,9 +246,15 @@
     Array.from(answersEl.children).forEach((li, i) => {
       li.classList.remove('selected');
       li.style.pointerEvents = 'none';
-      if(i === idx) li.classList.add('selected');
+      li.setAttribute('aria-pressed', 'false');
+      if(i === idx) {
+        li.classList.add('selected');
+        li.setAttribute('aria-pressed', 'true');
+      }
     });
     nextBtn.disabled = false;
+    nextBtn.setAttribute('aria-disabled', 'false');
+    nextBtn.focus();
   }
 
   async function submitAnswer() {
@@ -271,9 +286,10 @@
   }
 
   nextBtn.addEventListener('click', async () => {
-    nextBtn.disabled = true;
-
     if(selectedAnswerIndex === null) return;
+
+    nextBtn.disabled = true;
+    nextBtn.setAttribute('aria-disabled', 'true');
 
     // Submit answer to backend and show explanation
     await submitAnswer();
@@ -292,7 +308,7 @@
   });
 
   function showFinalScore() {
-    questionEl.textContent = "Quiz Completed!";
+    questionEl.textContent = "🎉 Quiz Completed!";
     answersEl.innerHTML = '';
     explanationEl.textContent = '';
     nextBtn.style.display = 'none';
