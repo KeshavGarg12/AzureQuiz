@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Trivia Quiz Game</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 2rem; }
+  #question { font-size: 1.2rem; margin-bottom: 1rem; }
+  button { display: block; margin: 0.5rem 0; padding: 0.5rem 1rem; font-size: 1rem; }
+  #result { margin-top: 1rem; font-weight: bold; }
+</style>
+</head>
+<body>
+  <h1>Trivia Quiz Game</h1>
+  <div id="quiz">
+    <div id="question">Loading question...</div>
+    <div id="options"></div>
+    <div id="result"></div>
+  </div>
+
+  <script>
+    const apiUrl = 'https://YOUR_FUNCTION_APP.azurewebsites.net/api/TriviaFunction';
+    let currentQuestionId = null;
+
+    async function loadQuestion() {
+      document.getElementById('result').textContent = '';
+      const res = await fetch(apiUrl);
+      const data = await res.json();
+      currentQuestionId = data.id;
+      document.getElementById('question').textContent = data.question;
+      const optionsDiv = document.getElementById('options');
+      optionsDiv.innerHTML = '';
+      data.options.forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.textContent = opt;
+        btn.onclick = () => submitAnswer(idx);
+        optionsDiv.appendChild(btn);
+      });
+    }
+
+    async function submitAnswer(selectedIndex) {
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionId: currentQuestionId, selectedIndex })
+      });
+      const data = await res.json();
+      document.getElementById('result').textContent = data.correct ? 'Correct! 🎉' : 'Wrong answer. 😞';
+      // Load new question after 2 seconds
+      setTimeout(loadQuestion, 2000);
+    }
+
+    loadQuestion();
+  </script>
+</body>
+</html>
