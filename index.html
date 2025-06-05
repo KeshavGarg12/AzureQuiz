@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -53,5 +53,255 @@
 
     loadQuestion();
   </script>
+</body>
+</html>
+ -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Modern Quiz UI</title>
+<style>
+  /* Reset */
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0; padding: 0;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 15px;
+  }
+
+  .quiz-wrapper {
+    background: #fff;
+    max-width: 600px;
+    width: 100%;
+    border-radius: 12px;
+    box-shadow: 0 12px 24px rgba(0,0,0,0.2);
+    padding: 30px 40px;
+    color: #333;
+  }
+
+  h1 {
+    font-weight: 700;
+    color: #4b3f6b;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  #question {
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin-bottom: 20px;
+    min-height: 60px;
+    color: #2c2c54;
+  }
+
+  .answers {
+    list-style: none;
+    padding: 0;
+    margin-bottom: 20px;
+  }
+
+  .answers li {
+    background: #f0f0f0;
+    margin-bottom: 12px;
+    padding: 14px 20px;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: background 0.3s ease;
+    border: 2px solid transparent;
+    user-select: none;
+  }
+  .answers li:hover {
+    background: #d6e0f0;
+  }
+  .answers li.selected {
+    background: #6c63ff;
+    color: #fff;
+    font-weight: 700;
+    border-color: #4834d4;
+  }
+
+  #explanation {
+    font-style: italic;
+    font-size: 1rem;
+    color: #555;
+    min-height: 40px;
+    margin-bottom: 15px;
+  }
+
+  #nextBtn {
+    display: block;
+    margin: 0 auto;
+    background-color: #6c63ff;
+    color: white;
+    border: none;
+    padding: 12px 32px;
+    border-radius: 50px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    user-select: none;
+  }
+  #nextBtn:hover:enabled {
+    background-color: #4834d4;
+  }
+  #nextBtn:disabled {
+    background-color: #aaa;
+    cursor: not-allowed;
+  }
+
+  #score {
+    text-align: center;
+    font-weight: 700;
+    color: #4b3f6b;
+    font-size: 1.3rem;
+    margin-top: 25px;
+  }
+</style>
+</head>
+<body>
+
+<div class="quiz-wrapper" role="main" aria-live="polite">
+  <h1>Interactive Quiz</h1>
+  <div id="question">Loading question...</div>
+  <ul class="answers" id="answers"></ul>
+  <div id="explanation"></div>
+  <button id="nextBtn" disabled>Next</button>
+  <div id="score"></div>
+</div>
+
+<script>
+  const questionEl = document.getElementById('question');
+  const answersEl = document.getElementById('answers');
+  const explanationEl = document.getElementById('explanation');
+  const nextBtn = document.getElementById('nextBtn');
+  const scoreEl = document.getElementById('score');
+
+  let currentQuestionIndex = 0;
+  let selectedAnswerIndex = null;
+  let score = 0;
+  let questions = [];
+
+  // Replace this with your Azure Function URL
+  const functionUrl = 'https://quiz123.azurewebsites.net/api/HttpTrigger1?';
+
+  async function fetchQuestions() {
+    try {
+      const response = await fetch(functionUrl);
+      if (!response.ok) throw new Error('Failed to load questions');
+      questions = await response.json();
+      currentQuestionIndex = 0;
+      score = 0;
+      scoreEl.textContent = '';
+      loadQuestion();
+    } catch (error) {
+      questionEl.textContent = "Error loading questions.";
+      console.error(error);
+    }
+  }
+
+  function loadQuestion() {
+    explanationEl.textContent = '';
+    selectedAnswerIndex = null;
+    nextBtn.disabled = true;
+
+    const q = questions[currentQuestionIndex];
+    questionEl.textContent = q.question || q.q || "Question text missing";
+
+    answersEl.innerHTML = '';
+    q.answers.forEach((answer, idx) => {
+      const li = document.createElement('li');
+      li.textContent = answer;
+      li.tabIndex = 0;
+      li.addEventListener('click', () => selectAnswer(idx));
+      li.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') selectAnswer(idx);
+      });
+      answersEl.appendChild(li);
+    });
+  }
+
+  function selectAnswer(idx) {
+    if (selectedAnswerIndex !== null) return; // prevent multiple selection
+    selectedAnswerIndex = idx;
+    Array.from(answersEl.children).forEach((li, i) => {
+      li.classList.remove('selected');
+      li.style.pointerEvents = 'none';
+      if(i === idx) li.classList.add('selected');
+    });
+    nextBtn.disabled = false;
+  }
+
+  async function submitAnswer() {
+    const q = questions[currentQuestionIndex];
+    try {
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          questionId: q.id || currentQuestionIndex,
+          selected: selectedAnswerIndex
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to submit answer');
+      const result = await response.json();
+
+      if(result.correct) {
+        score++;
+        explanationEl.textContent = "Correct! " + (result.explanation || "");
+      } else {
+        explanationEl.textContent = "Incorrect! " + (result.explanation || "");
+      }
+      scoreEl.textContent = `Score: ${score} / ${questions.length}`;
+    } catch (error) {
+      explanationEl.textContent = "Error validating answer.";
+      console.error(error);
+    }
+  }
+
+  nextBtn.addEventListener('click', async () => {
+    nextBtn.disabled = true;
+
+    if(selectedAnswerIndex === null) return;
+
+    // Submit answer to backend and show explanation
+    await submitAnswer();
+
+    // Move to next question or finish
+    currentQuestionIndex++;
+    if(currentQuestionIndex < questions.length) {
+      setTimeout(() => {
+        loadQuestion();
+      }, 2000);  // 2 seconds pause to read explanation
+    } else {
+      setTimeout(() => {
+        showFinalScore();
+      }, 2000);
+    }
+  });
+
+  function showFinalScore() {
+    questionEl.textContent = "Quiz Completed!";
+    answersEl.innerHTML = '';
+    explanationEl.textContent = '';
+    nextBtn.style.display = 'none';
+    scoreEl.textContent = `Final Score: ${score} / ${questions.length}`;
+  }
+
+  // Initialize quiz by loading questions from backend
+  fetchQuestions();
+</script>
+
 </body>
 </html>
